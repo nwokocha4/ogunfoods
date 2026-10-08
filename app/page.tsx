@@ -2,6 +2,7 @@
 // It shows the app name and whether the Supabase connection works.
 // Real customer pages (restaurants, menu, cart, checkout) come in later phases.
 import { connection } from "next/server";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
 // Check the Supabase connection on every request, not at build time,
@@ -67,6 +68,22 @@ export default async function Home() {
           {label}
         </span>
         <p className="mt-3 text-sm leading-6 text-stone-600">{detail}</p>
+      </div>
+
+      {/* Quick routes for Phase 1. These go away once real pages exist. */}
+      <div className="mt-5 flex w-full gap-3">
+        <Link
+          href="/login"
+          className="flex-1 rounded-xl bg-emerald-700 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-emerald-800"
+        >
+          Sign in
+        </Link>
+        <Link
+          href="/account"
+          className="flex-1 rounded-xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-bold text-stone-700 transition hover:bg-stone-50"
+        >
+          Account
+        </Link>
       </div>
     </main>
   );

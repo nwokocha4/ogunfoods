@@ -6,6 +6,10 @@
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
+    // Lets a test file import "./phone.ts" with the extension, which is
+    // what Node needs when running the test directly. Only allowed
+    // because noEmit is on (the compiler never writes output files).
+    "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
