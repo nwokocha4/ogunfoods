@@ -43,6 +43,18 @@ export function plainAuthError(error: unknown): string {
     return "Too many attempts. Wait about a minute, then try again.";
   }
 
+  // Twilio in trial mode will only message numbers you have added to its
+  // Verified Caller ID list. This is the very first wall anyone hits when
+  // wiring up SMS, so it gets its own message rather than a vague one.
+  if (
+    both.includes("verified recipient") ||
+    both.includes("trial") ||
+    both.includes("error 572002") ||
+    both.includes("572002")
+  ) {
+    return "This number is not allowed to receive codes yet. During setup, the Twilio trial account only sends to numbers added to its Verified Caller ID list.";
+  }
+
   // Phone number we cannot send to, or SMS not switched on.
   if (
     both.includes("phone") && both.includes("not") ||
