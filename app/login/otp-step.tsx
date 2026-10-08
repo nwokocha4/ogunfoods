@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { plainAuthError } from "@/lib/auth/auth-errors";
 
-const RESEND_SECONDS = 45;
+// Must match Supabase's own cooldown: it refuses a second code to the
+// same number for 60 seconds. If our button re-enabled any sooner, the
+// customer would tap it and get a confusing error.
+const RESEND_SECONDS = 60;
 
 export function OtpStep({
   phone,
