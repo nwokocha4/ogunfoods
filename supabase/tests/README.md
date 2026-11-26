@@ -19,16 +19,16 @@ It only reads Postgres's catalogue tables, so it creates and changes nothing.
 
 | Result | Meaning |
 | --- | --- |
-| 7 tables, all `row_security = t` | Every table is locked down |
-| `policy_count = 18` | All the rules are in place |
-| 9 helper functions | The `is_admin()` family plus the triggers |
+| 9 tables, all `row_security = t` | Every table is locked down |
+| `policy_count = 22` | All the rules are in place |
+| 10 helper functions | The `is_admin()` family plus the triggers |
 
 **If a table shows `f`**, that table is wide open to anyone holding the anon
 key. Re-run `../migrations/0002_rls.sql`.
 
 ---
 
-## B. The real proof — run the 28-assertion suite locally
+## B. The real proof — run the 40-assertion suite locally
 
 This one actually tries to do the wrong things and checks that the database
 refuses them.
@@ -49,36 +49,38 @@ cd supabase/tests
 Requires Docker running. It pulls `postgres:16` the first time. Every run drops
 and rebuilds its database, so results are always from a clean slate.
 
-**Expected output:** `RESULT: 28 passed, 0 failed`
+**Expected output:** `RESULT: 40 passed, 0 failed`
 
 ### The one detail that makes these tests honest
 
 Every assertion runs as `anon` or `authenticated` — **never** as `postgres`.
 
 `postgres` is a superuser and **bypasses row-level security entirely**. If the
-tests ran as `postgres`, all 28 would pass even with every policy deleted. This
+tests ran as `postgres`, all 40 would pass even with every policy deleted. This
 is the single easiest way to write a security test that proves nothing.
 
 ---
 
-## What the 28 assertions cover
+## What the 40 assertions cover
 
-**Can they read? (13)**
+**Can they read? (16)**
 Customer A and B each see only their own orders; the agent sees only the order
 assigned to them; an anonymous visitor sees active restaurants and available
 dishes (but not hidden restaurants or sold-out items); settings and delivery
 areas are readable by anyone; the admin sees everything.
 
-**Must be refused (9)**
+**Must be refused (16)**
 A customer cannot insert an order (prices are computed server-side in Phase 3),
 cannot promote themselves to admin, and cannot edit someone else's profile. An
-agent cannot change the money on an order, cannot edit an unassigned order, and
-cannot change a menu price. An anonymous visitor cannot change a fee.
+agent cannot change the money on an order, cannot edit an unassigned order, assign
+themselves to one, or change a menu price. An anonymous visitor cannot change a
+fee. The owner cannot assign a customer as an agent or hand an order out before
+payment is confirmed.
 
-**Must succeed (6)**
+**Must succeed (8)**
 An agent can advance the status; a customer can update their own name; the admin
-can confirm payment, assign an agent and change a fee; and the owner can change
-a role from the Supabase dashboard.
+can confirm payment, assign an agent and change a fee; the owner can unassign
+an agent and change a role from the Supabase dashboard.
 
 ---
 
@@ -108,7 +110,7 @@ happen for real.
 | File | What it is |
 | --- | --- |
 | `policy_check.sql` | Safe, read-only check for your **live** project |
-| `rls_test.sh` | Runs the 28 assertions in a throwaway container |
+| `rls_test.sh` | Runs the 40 assertions in a throwaway container |
 | `auth_mock.sql` | Stands in for the `auth` schema Supabase provides |
 | `setup.sql` | Four test people, two orders, one restaurant, a menu |
 

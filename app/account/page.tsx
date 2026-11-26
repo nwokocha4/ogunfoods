@@ -40,6 +40,7 @@ export default async function AccountPage() {
   const label = phone.startsWith("+234")
     ? "0" + phone.slice(4)
     : phone;
+ const isAgent = profile?.role === "agent";
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-[#FFFCF7] px-6 py-10">
@@ -80,6 +81,15 @@ export default async function AccountPage() {
           </div>
         </dl>
       </div>
+
+ {isAgent && (
+ <Link
+ href="/agent"
+ className="mb-3 block rounded-xl bg-emerald-700 px-4 py-3.5 text-center text-base font-bold text-white transition hover:bg-emerald-800"
+ >
+ My deliveries
+ </Link>
+ )}
 
       <form action={signOut} className="mt-5">
         <button

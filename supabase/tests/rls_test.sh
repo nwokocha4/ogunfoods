@@ -3,7 +3,7 @@
 # Foodrun — row-level security test suite
 # =====================================================================
 # Builds a throwaway Postgres inside Docker, applies the real migrations,
-# then runs 28 assertions about who can read and write what.
+# then runs 40 assertions about who can read and write what.
 #
 #   ./rls_test.sh
 #
@@ -65,6 +65,9 @@ to_container "$here/auth_mock.sql"  "/run_auth.sql"
 to_container "$here/setup.sql"      "/run_setup.sql"
 to_container "$here/../migrations/0001_schema.sql" "/run_0001_schema.sql"
 to_container "$here/../migrations/0002_rls.sql"    "/run_0002_rls.sql"
+to_container "$here/../migrations/0003_carts.sql" "/run_0003_carts.sql"
+to_container "$here/../migrations/0006_agent_status_guard.sql" "/run_0006_agent_status_guard.sql"
+to_container "$here/../migrations/0007_agent_assignment_guard.sql" "/run_0007_agent_assignment_guard.sql"
 
 # --- 3. Fresh database every run ---------------------------------------
 log "rebuilding database $DB"
@@ -74,7 +77,7 @@ docker exec "$CONTAINER" psql -U postgres -d postgres -q \
   -c "drop role if exists anon;" \
   -c "create database $DB;" >/dev/null 2>&1
 
-for f in auth 0001_schema 0002_rls setup; do
+for f in auth 0001_schema 0002_rls 0003_carts 0006_agent_status_guard 0007_agent_assignment_guard setup; do
   if ! docker exec "$CONTAINER" psql -U postgres -d "$DB" -v ON_ERROR_STOP=1 -q \
       -f "/run_$f.sql" >/dev/null 2>&1; then
     echo "FAILED while running $f — re-run to see the error:" >&2
@@ -127,6 +130,9 @@ t "customer reads own profile only"           "$ACUST" "select count(*) from pro
 t "customer reads own order items only"       "$ACUST" "select count(*) from order_items;" "1"
 t "customer B cannot read A's order items"    "$BCUST" "select count(*) from order_items;" "0"
 t "admin sees every profile"                  "$ADMIN" "select count(*) from profiles;" "4"
+t "customer A sees only their own cart" "$ACUST" "select count(*) from carts;" "1"
+t "customer B cannot see A cart items" "$BCUST" "select count(*) from cart_items;" "0"
+t "anon cannot see any carts" "ANON" "select count(*) from carts;" "0"
 t "admin sees every order"                    "$ADMIN" "select count(*) from orders;" "2"
 
 echo ""
@@ -136,17 +142,26 @@ t "anon cannot insert an order"                "ANON"   "insert into orders (cus
 t "customer cannot promote themselves to admin" "$ACUST" "update profiles set role='admin' where id='$ACUST';" "ERROR"
 t "customer cannot edit someone else's profile" "$ACUST" "update profiles set full_name='x' where id='$BCUST';" "UPDATE 0"
 t "agent cannot change the money on an order"  "$AGENT" "update orders set total=1 where agent_id='$AGENT';" "ERROR"
+t "agent cannot skip status steps" "$AGENT" "update orders set status='delivered' where agent_id='$AGENT';" "ERROR"
+t "agent cannot move backwards" "$AGENT" "update orders set status='received' where agent_id='$AGENT';" "ERROR"
+t "agent cannot cancel an order" "$AGENT" "update orders set status='cancelled' where agent_id='$AGENT';" "ERROR"
+t "agent cannot change details with the status" "$AGENT" "update orders set status='picked_up', total=1 where agent_id='$AGENT';" "ERROR"
 t "agent cannot edit an unassigned order"      "$AGENT" "update orders set status='delivered' where agent_id is null;" "UPDATE 0"
 t "agent cannot change a menu price"           "$AGENT" "update menu_items set price=1 where restaurant_id='$RID';" "UPDATE 0"
 t "anon cannot change a fee"                   "ANON"   "update settings set delivery_fee=0 where id=1;" "UPDATE 0"
 t "customer cannot write order items"          "$ACUST" "update order_items set unit_price=1;" "UPDATE 0"
+t "admin cannot assign a customer as an agent" "$ADMIN" "update orders set agent_id='$ACUST' where id='bbbbbbbb-0000-0000-0000-000000000002';" "ERROR"
+t "admin cannot assign an agent before payment is confirmed" "$ADMIN" "update orders set agent_id='$AGENT' where id='bbbbbbbb-0000-0000-0000-000000000002';" "ERROR"
+t "agent cannot assign themselves to an order" "$AGENT" "update orders set agent_id='$AGENT' where id='bbbbbbbb-0000-0000-0000-000000000002';" "UPDATE 0"
 
 echo ""
 echo "=== MUST SUCCEED ==="
-t "agent CAN advance the status"   "$AGENT" "update orders set status='on_the_way' where agent_id='$AGENT';" "UPDATE 1"
+t "admin CAN confirm payment on order 2" "$ADMIN" "update orders set payment_confirmed_at=now(), status='confirmed' where id='bbbbbbbb-0000-0000-0000-000000000002';" "UPDATE 1"
+t "agent CAN advance one step"   "$AGENT" "update orders set status='agent_buying' where agent_id='$AGENT';" "UPDATE 1"
 t "customer CAN update their own name" "$ACUST" "update profiles set full_name='Chidi' where id='$ACUST';" "UPDATE 1"
 t "admin CAN confirm payment"      "$ADMIN" "update orders set payment_confirmed_at=now(), status='confirmed' where id='bbbbbbbb-0000-0000-0000-000000000001';" "UPDATE 1"
 t "admin CAN assign an agent"      "$ADMIN" "update orders set agent_id='$AGENT' where id='bbbbbbbb-0000-0000-0000-000000000002';" "UPDATE 1"
+t "admin CAN unassign an agent" "$ADMIN" "update orders set agent_id=null where id='bbbbbbbb-0000-0000-0000-000000000002';" "UPDATE 1"
 t "admin CAN change a fee"         "$ADMIN" "update settings set delivery_fee=700 where id=1;" "UPDATE 1"
 t "owner in dashboard CAN change a role" "OWNER" "update profiles set role='agent' where id='$BCUST';" "UPDATE 1"
 

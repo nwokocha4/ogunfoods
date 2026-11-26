@@ -53,7 +53,7 @@ export function OtpStep({
 
     // Signed in. Go to the account page and refresh so the server sees
     // the new session cookie.
-    router.push("/account");
+    router.push("/");
     router.refresh();
   }
 

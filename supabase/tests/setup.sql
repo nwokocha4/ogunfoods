@@ -24,11 +24,15 @@ insert into public.menu_items (restaurant_id,name,price,is_available) values
  ('aaaaaaaa-0000-0000-0000-000000000001','Jollof rice',3500,true),
  ('aaaaaaaa-0000-0000-0000-000000000001','Sold out dish',2000,false);
 insert into public.delivery_areas (name) values ('Ikeja');
+
+-- Cart for customer A, so the cart assertions have something to read.
+insert into public.carts (id, restaurant_id) values ('22222222-2222-2222-2222-222222222222','aaaaaaaa-0000-0000-0000-000000000001');
+insert into public.cart_items (cart_id, item_name, unit_price, quantity) values ('22222222-2222-2222-2222-222222222222','Jollof rice',3500,2);
 insert into public.settings (id) values (1);
 
 -- Order 1: Cust A, assigned to the agent.
-insert into public.orders (id,customer_id,restaurant_id,agent_id,customer_name,customer_phone,delivery_address,food_subtotal,delivery_fee,service_fee,total)
- values ('bbbbbbbb-0000-0000-0000-000000000001','22222222-2222-2222-2222-222222222222','aaaaaaaa-0000-0000-0000-000000000001','44444444-4444-4444-4444-444444444444','Cust A','+2348000000002','Ikeja',3500,1000,175,4675);
+insert into public.orders (id,customer_id,restaurant_id,agent_id,customer_name,customer_phone,delivery_address,food_subtotal,delivery_fee,service_fee,total,status,payment_confirmed_at)
+ values ('bbbbbbbb-0000-0000-0000-000000000001','22222222-2222-2222-2222-222222222222','aaaaaaaa-0000-0000-0000-000000000001','44444444-4444-4444-4444-444444444444','Cust A','+2348000000002','Ikeja',3500,1000,175,4675,'confirmed',now());
 -- Order 2: Cust B, not yet assigned to anyone.
 insert into public.orders (id,customer_id,restaurant_id,customer_name,customer_phone,delivery_address,food_subtotal,delivery_fee,service_fee,total)
  values ('bbbbbbbb-0000-0000-0000-000000000002','33333333-3333-3333-3333-333333333333','aaaaaaaa-0000-0000-0000-000000000001','Cust B','+2348000000003','Ikeja',3500,1000,175,4675);

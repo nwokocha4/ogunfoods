@@ -146,8 +146,40 @@ This is the most important step. **Never paste keys into your code.**
 - [ ] **Restaurants and menus:** real names, addresses, opening hours, image URLs, prices.
 - [ ] **Your admin profile:** make sure your own row in `profiles` has `role = admin`.
 - [ ] **Your agent's phone numbers:** added to `profiles` with `role = agent`.
+- [ ] **Agent assignment:** know how to set an order's `agent_id` after confirming payment (see below).
+- [ ] **Auto-cancel job:** service key and cron secret are set on Vercel (see below).
 - [ ] **Turn off the test OTP** and use real SMS (Supabase → Authentication → Providers → Phone).
 - [ ] **Add your live URL** to Supabase Authentication → URL Configuration → Redirect URLs.
+
+## Assigning an agent to an order
+
+The owner does this in Supabase — there is no admin page in this version.
+
+1. Confirm the customer's payment first: in `orders`, set `payment_confirmed_at` and change `status` to `confirmed`.
+2. In `profiles`, copy the `id` of the person whose `role` is `agent`.
+3. Back in `orders`, open that order and paste the id into `agent_id`, then save.
+4. The agent's "My deliveries" page picks it up by itself within seconds.
+
+To undo a wrong assignment, clear `agent_id` (leave it empty) and save. An order can only be assigned to a profile with `role = agent`, and not before payment has been confirmed.
+
+## Automatic cancellation of unpaid orders
+
+An order still at `received` 30 minutes after it was placed is cancelled automatically. Vercel calls `/api/cron/cancel-expired-orders` every 5 minutes, and that job cancels any expired unpaid orders. There is nothing to click in Supabase for this.
+
+- [ ] In Supabase → Settings → API, copy the **service_role** key. This one bypasses security, so treat it like a password. (The anon key will not work for this job.)
+- [ ] In Vercel → your project → Settings → Environment Variables, add `SUPABASE_SERVICE_ROLE_KEY` (the key you just copied) and `CRON_SECRET` (a long random string you make up). Add them to **Production**; add them to your local `.env.local` too if you want to test the job from your laptop.
+- [ ] Save and deploy. `Vercel.json` already contains the cron schedule; Vercel adds `Authorization: Bearer <your CRON_SECRET>` to each call by itself when `CRON_SECRET` is set.
+- [ ] Check Vercel → your project → Cron Jobs. You should see `/api/cron/cancel-expired-orders` listed with a 5-minute schedule.
+
+To test it without waiting half an hour: make a test order, then in the Supabase Table editor set that order's `expires_at` to a time in the past (and leave its status as `received`). Click **Run** next to the cron job in Vercel, or call it locally:
+
+```
+curl -H "Authorization: Bearer YOUR_CRON_SECRET" http://localhost:3000/api/cron/cancel-expired-orders
+```
+
+The reply should be JSON like `{"cancelled":1,"references":["LFD-1234"]}`, and the order's status in Supabase should now be `cancelled`. Calling it again should say `cancelled: 0`. An order whose payment has already been confirmed is never cancelled.
+
+> **Check your Vercel plan:** Vercel Hobby allows cron jobs only once per day. The 5-minute schedule in `vercel.json` requires Vercel Pro. If your plan is Hobby, the Cron Jobs page will reject or ignore that schedule — tell Claude so we can choose a different approach.
 
 ---
 
