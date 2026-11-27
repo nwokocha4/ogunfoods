@@ -1,0 +1,37 @@
+# Vercel Hobby cannot run a cron every 5 minutes, so the site does not
+# define one. GitHub Actions is free for this public repo and calls the
+# same protected endpoint instead. Supabase remains the only backend.
+name: Cancel expired orders
+
+on:
+  schedule:
+    - cron: "*/5 * * * *" # every 5 minutes, UTC
+  workflow_dispatch: # lets the owner test it manually from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  cancel-expired-orders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the auto-cancel endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          CRON_URL: ${{ vars.CRON_URL }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "GitHub secret CRON_SECRET is missing." >&2
+            exit 1
+          fi
+          if [ -z "$CRON_URL" ]; then
+            echo "GitHub variable CRON_URL is missing." >&2
+            exit 1
+          fi
+
+          url="${CRON_URL%/}/api/cron/cancel-expired-orders"
+          echo "Calling the auto-cancel endpoint..."
+          curl --fail-with-body --silent --show-error --max-time 30 \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            "$url"
+          echo

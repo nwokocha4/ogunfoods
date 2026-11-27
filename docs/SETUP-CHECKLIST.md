@@ -147,7 +147,7 @@ This is the most important step. **Never paste keys into your code.**
 - [ ] **Your admin profile:** make sure your own row in `profiles` has `role = admin`.
 - [ ] **Your agent's phone numbers:** added to `profiles` with `role = agent`.
 - [ ] **Agent assignment:** know how to set an order's `agent_id` after confirming payment (see below).
-- [ ] **Auto-cancel job:** service key and cron secret are set on Vercel (see below).
+- [ ] **Auto-cancel job:** service key and cron secret are set on Vercel, and `CRON_SECRET` + `CRON_URL` are set in GitHub Actions (see below).
 - [ ] **Turn off the test OTP** and use real SMS (Supabase → Authentication → Providers → Phone).
 - [ ] **Add your live URL** to Supabase Authentication → URL Configuration → Redirect URLs.
 
@@ -164,14 +164,18 @@ To undo a wrong assignment, clear `agent_id` (leave it empty) and save. An order
 
 ## Automatic cancellation of unpaid orders
 
-An order still at `received` 30 minutes after it was placed is cancelled automatically. Vercel calls `/api/cron/cancel-expired-orders` every 5 minutes, and that job cancels any expired unpaid orders. There is nothing to click in Supabase for this.
+An order still at `received` 30 minutes after it was placed is cancelled automatically. A GitHub Actions workflow calls `/api/cron/cancel-expired-orders` every 5 minutes, and that job cancels any expired unpaid orders. There is nothing to click in Supabase for this.
+
+Vercel Hobby only allows cron jobs once a day, so the site does **not** define a cron itself. GitHub Actions does it for free on this public repo. Supabase is still the only backend; the scheduler just makes an HTTP request.
 
 - [ ] In Supabase → Settings → API, copy the **service_role** key. This one bypasses security, so treat it like a password. (The anon key will not work for this job.)
-- [ ] In Vercel → your project → Settings → Environment Variables, add `SUPABASE_SERVICE_ROLE_KEY` (the key you just copied) and `CRON_SECRET` (a long random string you make up). Add them to **Production**; add them to your local `.env.local` too if you want to test the job from your laptop.
-- [ ] Save and deploy. `Vercel.json` already contains the cron schedule; Vercel adds `Authorization: Bearer <your CRON_SECRET>` to each call by itself when `CRON_SECRET` is set.
-- [ ] Check Vercel → your project → Cron Jobs. You should see `/api/cron/cancel-expired-orders` listed with a 5-minute schedule.
+- [ ] In Vercel → your project → Settings → Environment Variables, add `SUPABASE_SERVICE_ROLE_KEY` (the key you just copied) and `CRON_SECRET` (the same long random string you make up below). Add them to **Production**; add them to your local `.env.local` too if you want to test the job from your laptop.
+- [ ] In GitHub → this repo → Settings → Secrets and variables → Actions, add `CRON_SECRET` as a **secret** (the same value as above).
+- [ ] In the same place, add `CRON_URL` as a **variable** with your live site URL, for example `https://your-app.vercel.app` — no trailing slash. This is not a secret.
+- [ ] Save and push. The site builds on Vercel Hobby because `vercel.json` is no longer in the repo.
+- [ ] Check GitHub → this repo → Actions → **Cancel expired orders**. You should see a run about every 5 minutes. You can also click **Run workflow** to trigger one by hand.
 
-To test it without waiting half an hour: make a test order, then in the Supabase Table editor set that order's `expires_at` to a time in the past (and leave its status as `received`). Click **Run** next to the cron job in Vercel, or call it locally:
+To test it without waiting half an hour: make a test order, then in the Supabase Table editor set that order's `expires_at` to a time in the past (and leave its status as `received`). Click **Run workflow** in GitHub Actions, or call it locally:
 
 ```
 curl -H "Authorization: Bearer YOUR_CRON_SECRET" http://localhost:3000/api/cron/cancel-expired-orders
@@ -179,7 +183,7 @@ curl -H "Authorization: Bearer YOUR_CRON_SECRET" http://localhost:3000/api/cron/
 
 The reply should be JSON like `{"cancelled":1,"references":["LFD-1234"]}`, and the order's status in Supabase should now be `cancelled`. Calling it again should say `cancelled: 0`. An order whose payment has already been confirmed is never cancelled.
 
-> **Check your Vercel plan:** Vercel Hobby allows cron jobs only once per day. The 5-minute schedule in `vercel.json` requires Vercel Pro. If your plan is Hobby, the Cron Jobs page will reject or ignore that schedule — tell Claude so we can choose a different approach.
+> GitHub may delay scheduled runs by a few minutes when its servers are busy. That is normal; the job is safe to repeat, so a late run cannot cancel an order twice.
 
 ---
 
@@ -188,6 +192,7 @@ The reply should be JSON like `{"cancelled":1,"references":["LFD-1234"]}`, and t
 | Service | What it does | Costs |
 | --- | --- | --- |
 | **GitHub** | Stores the code | Free |
+| **GitHub Actions** | Calls the 5-minute auto-cancel check | Free for public repos |
 | **Supabase** | Database, phone login, realtime, security | Free tier to start |
 | **Vercel** | Hosts the website | Free tier to start |
 
